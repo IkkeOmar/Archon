@@ -100,9 +100,9 @@ class TestService {
   private wsConnections: Map<string, WebSocket> = new Map();
 
   /**
-   * Execute Python tests using pytest via backend API
+   * Execute backend (pytest) checks via the FastAPI server.
    */
-  async runMCPTests(): Promise<TestExecution> {
+  async runBackendTests(): Promise<TestExecution> {
     const requestBody: TestExecutionRequest = {
       test_type: 'mcp',
       options: {}
@@ -113,6 +113,13 @@ class TestService {
       body: JSON.stringify(requestBody)
     });
     return response;
+  }
+
+  /**
+   * @deprecated Use runBackendTests instead.
+   */
+  async runMCPTests(): Promise<TestExecution> {
+    return this.runBackendTests();
   }
 
   /**

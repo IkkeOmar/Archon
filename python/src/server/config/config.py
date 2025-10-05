@@ -24,7 +24,6 @@ class EnvironmentConfig:
     port: int  # Required - no default
     openai_api_key: str | None = None
     host: str = "0.0.0.0"
-    transport: str = "sse"
 
 
 @dataclass
@@ -155,17 +154,7 @@ def load_environment_config() -> EnvironmentConfig:
 
     # Optional environment variables with defaults
     host = os.getenv("HOST", "0.0.0.0")
-    port_str = os.getenv("PORT")
-    if not port_str:
-        # This appears to be for MCP configuration based on default 8051
-        port_str = os.getenv("ARCHON_MCP_PORT")
-        if not port_str:
-            raise ConfigurationError(
-                "PORT or ARCHON_MCP_PORT environment variable is required. "
-                "Please set it in your .env file or environment. "
-                "Default value: 8051"
-            )
-    transport = os.getenv("TRANSPORT", "sse")
+    port_str = os.getenv("ARCHON_SERVER_PORT") or os.getenv("PORT") or "8181"
 
     # Validate and convert port
     try:
@@ -179,7 +168,6 @@ def load_environment_config() -> EnvironmentConfig:
         supabase_service_key=supabase_service_key,
         host=host,
         port=port,
-        transport=transport,
     )
 
 

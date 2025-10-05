@@ -67,24 +67,10 @@ export const RAGSettings = ({
               options={[
                 { value: 'openai', label: 'OpenAI' },
                 { value: 'google', label: 'Google Gemini' },
-                { value: 'ollama', label: 'Ollama (Coming Soon)' },
+                { value: 'anthropic', label: 'Claude (Anthropic)' },
               ]}
             />
           </div>
-          {ragSettings.LLM_PROVIDER === 'ollama' && (
-            <div>
-              <Input
-                label="Ollama Base URL"
-                value={ragSettings.LLM_BASE_URL || 'http://localhost:11434/v1'}
-                onChange={e => setRagSettings({
-                  ...ragSettings,
-                  LLM_BASE_URL: e.target.value
-                })}
-                placeholder="http://localhost:11434/v1"
-                accentColor="green"
-              />
-            </div>
-          )}
           <div className="flex items-end">
             <Button 
               variant="outline" 
@@ -480,10 +466,10 @@ function getModelPlaceholder(provider: string): string {
   switch (provider) {
     case 'openai':
       return 'e.g., gpt-4o-mini';
-    case 'ollama':
-      return 'e.g., llama2, mistral';
     case 'google':
       return 'e.g., gemini-1.5-flash';
+    case 'anthropic':
+      return 'e.g., claude-3-5-sonnet-latest';
     default:
       return 'e.g., gpt-4o-mini';
   }
@@ -493,10 +479,10 @@ function getEmbeddingPlaceholder(provider: string): string {
   switch (provider) {
     case 'openai':
       return 'Default: text-embedding-3-small';
-    case 'ollama':
-      return 'e.g., nomic-embed-text';
     case 'google':
       return 'e.g., text-embedding-004';
+    case 'anthropic':
+      return 'Use Claude for chat + OpenAI or Gemini for embeddings';
     default:
       return 'Default: text-embedding-3-small';
   }

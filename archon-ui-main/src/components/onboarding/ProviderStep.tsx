@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Key, ExternalLink, Save, Loader } from "lucide-react";
 import { Input } from "../ui/Input";
 import { Button } from "../ui/Button";
@@ -11,11 +11,55 @@ interface ProviderStepProps {
   onSkip: () => void;
 }
 
+type SupportedProvider = "openai" | "google" | "anthropic";
+
+interface ProviderConfig {
+  label: string;
+  description: string;
+  docsUrl: string;
+  apiKeyExample: string;
+  apiKeyLabel: string;
+  credentialKey: string;
+  defaultModel: string;
+}
+
+const PROVIDERS: Record<SupportedProvider, ProviderConfig> = {
+  openai: {
+    label: "OpenAI",
+    description: "Use GPT-4.1 or GPT-4o family models for fast, general-purpose reasoning.",
+    docsUrl: "https://platform.openai.com/api-keys",
+    apiKeyExample: "sk-proj-...",
+    apiKeyLabel: "OpenAI API Key",
+    credentialKey: "OPENAI_API_KEY",
+    defaultModel: "gpt-4.1-mini",
+  },
+  google: {
+    label: "Google Gemini",
+    description: "Run Google's Gemini models through the AI Studio OpenAI-compatible API.",
+    docsUrl: "https://aistudio.google.com/app/apikey",
+    apiKeyExample: "AIza...",
+    apiKeyLabel: "Google API Key",
+    credentialKey: "GOOGLE_API_KEY",
+    defaultModel: "gemini-1.5-flash",
+  },
+  anthropic: {
+    label: "Claude (Anthropic)",
+    description: "Access Claude 3 models for high-quality reasoning and code assistance.",
+    docsUrl: "https://console.anthropic.com/settings/keys",
+    apiKeyExample: "sk-ant-...",
+    apiKeyLabel: "Anthropic API Key",
+    credentialKey: "ANTHROPIC_API_KEY",
+    defaultModel: "claude-3-5-sonnet-latest",
+  },
+};
+
 export const ProviderStep = ({ onSaved, onSkip }: ProviderStepProps) => {
-  const [provider, setProvider] = useState("openai");
+  const [provider, setProvider] = useState<SupportedProvider>("openai");
   const [apiKey, setApiKey] = useState("");
   const [saving, setSaving] = useState(false);
   const { showToast } = useToast();
+
+  const providerConfig = useMemo(() => PROVIDERS[provider], [provider]);
 
   const handleSave = async () => {
     if (!apiKey.trim()) {
@@ -25,23 +69,31 @@ export const ProviderStep = ({ onSaved, onSkip }: ProviderStepProps) => {
 
     setSaving(true);
     try {
-      // Save the API key
-      await credentialsService.createCredential({
-        key: "OPENAI_API_KEY",
+      // Save the selected provider API key
+      await credentialsService.updateCredential({
+        key: providerConfig.credentialKey,
         value: apiKey,
         is_encrypted: true,
         category: "api_keys",
       });
 
-      // Update the provider setting if needed
-      await credentialsService.updateCredential({
-        key: "LLM_PROVIDER",
-        value: "openai",
-        is_encrypted: false,
-        category: "rag_strategy",
-      });
+      // Persist the provider and default model so the backend can use it immediately
+      await Promise.all([
+        credentialsService.updateCredential({
+          key: "LLM_PROVIDER",
+          value: provider,
+          is_encrypted: false,
+          category: "rag_strategy",
+        }),
+        credentialsService.updateCredential({
+          key: "MODEL_CHOICE",
+          value: providerConfig.defaultModel,
+          is_encrypted: false,
+          category: "rag_strategy",
+        }),
+      ]);
 
-      showToast("API key saved successfully!", "success");
+      showToast(`${providerConfig.label} connected successfully!`, "success");
       // Mark onboarding as dismissed when API key is saved
       localStorage.setItem("onboardingDismissed", "true");
       onSaved();
@@ -52,18 +104,7 @@ export const ProviderStep = ({ onSaved, onSkip }: ProviderStepProps) => {
       console.error("Failed to save API key:", error);
 
       // Show specific error details to help user resolve the issue
-      if (
-        errorMessage.includes("duplicate") ||
-        errorMessage.includes("already exists")
-      ) {
-        showToast(
-          "API key already exists. Please update it in Settings if you want to change it.",
-          "warning",
-        );
-      } else if (
-        errorMessage.includes("network") ||
-        errorMessage.includes("fetch")
-      ) {
+      if (errorMessage.includes("network") || errorMessage.includes("fetch")) {
         showToast(
           `Network error while saving API key: ${errorMessage}. Please check your connection.`,
           "error",
@@ -91,128 +132,77 @@ export const ProviderStep = ({ onSaved, onSkip }: ProviderStepProps) => {
         <Select
           label="Select AI Provider"
           value={provider}
-          onChange={(e) => setProvider(e.target.value)}
+          onChange={(e) => {
+            const value = e.target.value as SupportedProvider;
+            setProvider(value);
+            setApiKey("");
+          }}
           options={[
             { value: "openai", label: "OpenAI" },
             { value: "google", label: "Google Gemini" },
-            { value: "ollama", label: "Ollama (Local)" },
+            { value: "anthropic", label: "Claude (Anthropic)" },
           ]}
           accentColor="green"
         />
         <p className="mt-2 text-sm text-gray-600 dark:text-zinc-400">
-          {provider === "openai" &&
-            "OpenAI provides powerful models like GPT-4. You'll need an API key from OpenAI."}
-          {provider === "google" &&
-            "Google Gemini offers advanced AI capabilities. Configure in Settings after setup."}
-          {provider === "ollama" &&
-            "Ollama runs models locally on your machine. Configure in Settings after setup."}
+          {providerConfig.description}
         </p>
       </div>
 
-      {/* OpenAI API Key Input */}
-      {provider === "openai" && (
-        <>
-          <div>
-            <Input
-              label="OpenAI API Key"
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="sk-..."
-              accentColor="green"
-              icon={<Key className="w-4 h-4" />}
-            />
-            <p className="mt-2 text-sm text-gray-600 dark:text-zinc-400">
-              Your API key will be encrypted and stored securely.
-            </p>
-          </div>
+      <div>
+        <Input
+          label={providerConfig.apiKeyLabel}
+          type="password"
+          value={apiKey}
+          onChange={(e) => setApiKey(e.target.value)}
+          placeholder={providerConfig.apiKeyExample}
+          accentColor="green"
+          icon={<Key className="w-4 h-4" />}
+        />
+        <p className="mt-2 text-sm text-gray-600 dark:text-zinc-400">
+          Keys are encrypted locally before being stored in Archon's credentials vault.
+        </p>
+      </div>
 
-          <div className="flex items-center gap-2 text-sm">
-            <a
-              href="https://platform.openai.com/api-keys"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
-            >
-              Get an API key from OpenAI
-              <ExternalLink className="w-3 h-3" />
-            </a>
-          </div>
+      <div className="flex items-center gap-2 text-sm">
+        <a
+          href={providerConfig.docsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
+        >
+          Get an API key from {providerConfig.label}
+          <ExternalLink className="w-3 h-3" />
+        </a>
+      </div>
 
-          <div className="flex gap-3 pt-4">
-            <Button
-              variant="primary"
-              size="lg"
-              onClick={handleSave}
-              disabled={saving || !apiKey.trim()}
-              icon={
-                saving ? (
-                  <Loader className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4" />
-                )
-              }
-              className="flex-1"
-            >
-              {saving ? "Saving..." : "Save & Continue"}
-            </Button>
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={handleSkip}
-              disabled={saving}
-              className="flex-1"
-            >
-              Skip for Now
-            </Button>
-          </div>
-        </>
-      )}
-
-      {/* Non-OpenAI Provider Message */}
-      {provider !== "openai" && (
-        <div className="space-y-4">
-          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <p className="text-sm text-blue-800 dark:text-blue-200">
-              {provider === "google" &&
-                "Google Gemini configuration will be available in Settings after setup."}
-              {provider === "ollama" &&
-                "Ollama configuration will be available in Settings after setup. Make sure Ollama is running locally."}
-            </p>
-          </div>
-
-          <div className="flex gap-3 pt-4">
-            <Button
-              variant="primary"
-              size="lg"
-              onClick={async () => {
-                // Save the provider selection for non-OpenAI providers
-                try {
-                  await credentialsService.updateCredential({
-                    key: "LLM_PROVIDER",
-                    value: provider,
-                    is_encrypted: false,
-                    category: "rag_strategy",
-                  });
-                  showToast(
-                    `${provider === "google" ? "Google Gemini" : "Ollama"} selected as provider`,
-                    "success",
-                  );
-                  // Mark onboarding as dismissed
-                  localStorage.setItem("onboardingDismissed", "true");
-                  onSaved();
-                } catch (error) {
-                  console.error("Failed to save provider selection:", error);
-                  showToast("Failed to save provider selection", "error");
-                }
-              }}
-              className="flex-1"
-            >
-              Continue with {provider === "google" ? "Gemini" : "Ollama"}
-            </Button>
-          </div>
-        </div>
-      )}
+      <div className="flex gap-3 pt-4">
+        <Button
+          variant="primary"
+          size="lg"
+          onClick={handleSave}
+          disabled={saving || !apiKey.trim()}
+          icon={
+            saving ? (
+              <Loader className="w-4 h-4 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4" />
+            )
+          }
+          className="flex-1"
+        >
+          {saving ? "Saving..." : "Save & Continue"}
+        </Button>
+        <Button
+          variant="outline"
+          size="lg"
+          onClick={handleSkip}
+          disabled={saving}
+          className="flex-1"
+        >
+          Skip for Now
+        </Button>
+      </div>
     </div>
   );
 };

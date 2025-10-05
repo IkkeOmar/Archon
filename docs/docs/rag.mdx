@@ -33,7 +33,7 @@ Access RAG settings in the **Web Interface** → **Settings** → **RAG Settings
 |---------|-------------|---------|--------|
 | **MODEL_CHOICE** | Chat model for query enhancement | `gpt-4o-mini` | Response quality |
 | **EMBEDDING_MODEL** | Model for vector embeddings | `text-embedding-3-small` | Search accuracy |
-| **LLM_PROVIDER** | Provider (openai/google/ollama/) | `openai` | Model availability |
+| **LLM_PROVIDER** | Provider (openai/google/anthropic/) | `openai` | Model availability |
 
 ### Advanced Strategies
 
@@ -319,7 +319,7 @@ EMBEDDING_MODEL=text-embedding-004
 
 ### Ollama (Local/Private)
 ```bash
-LLM_PROVIDER=ollama
+LLM_PROVIDER=anthropic
 LLM_BASE_URL=http://localhost:11434/v1
 MODEL_CHOICE=llama2
 EMBEDDING_MODEL=nomic-embed-text
