@@ -39,6 +39,8 @@ This new vision for Archon replaces the old one (the agenteer). Archon used to b
 
 ## Quick Start
 
+> 🔄 Looking for a simpler, single-process experience? Check out [Archon Lite](simple_agent_tool/README.md) for a FastAPI-based local agenting console that runs with a single `uvicorn` command and supports OpenAI, Anthropic, Google Gemini, and Llama providers.
+
 ### Prerequisites
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/)

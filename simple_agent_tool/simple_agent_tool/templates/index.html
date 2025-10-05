@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Archon Lite - Agentic Development Tool</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Archon Lite</h1>
+      <p>A lightweight agentic development control panel for your favourite LLMs.</p>
+    </header>
+
+    <main>
+      <section class="panel">
+        <h2>Conversation</h2>
+        <div class="controls">
+          <label>
+            Provider
+            <select id="provider"></select>
+          </label>
+          <label>
+            Model override (optional)
+            <input type="text" id="model" placeholder="Leave blank for default" />
+          </label>
+        </div>
+
+        <label>
+          System prompt
+          <textarea id="system" rows="3" placeholder="Optional instructions for the assistant"></textarea>
+        </label>
+
+        <div id="conversation" class="conversation" aria-live="polite"></div>
+
+        <label>
+          Message
+          <textarea id="prompt" rows="4" placeholder="Ask the assistant for help"></textarea>
+        </label>
+
+        <button id="send" type="button">Send</button>
+        <button id="reset" type="button" class="secondary">Reset conversation</button>
+      </section>
+
+      <aside class="panel info">
+        <h2>Getting Started</h2>
+        <ol>
+          <li>Copy <code>.env.example</code> to <code>.env</code>.</li>
+          <li>Add the API key(s) for the providers you wish to use.</li>
+          <li>Install dependencies with <code>pip install -r requirements.txt</code>.</li>
+          <li>Run <code>uvicorn simple_agent_tool.main:app --reload</code>.</li>
+        </ol>
+        <p class="note">
+          Providers without credentials will appear disabled. Configure keys in your <code>.env</code> file and refresh.
+        </p>
+      </aside>
+    </main>
+
+    <footer>
+      <small>Built for Windows &amp; Linux developers using FastAPI and vanilla JavaScript.</small>
+    </footer>
+
+    <script>
+      const providerSelect = document.getElementById("provider");
+      const modelInput = document.getElementById("model");
+      const systemInput = document.getElementById("system");
+      const promptInput = document.getElementById("prompt");
+      const conversation = document.getElementById("conversation");
+      const sendButton = document.getElementById("send");
+      const resetButton = document.getElementById("reset");
+
+      let history = [];
+
+      async function loadProviders() {
+        const response = await fetch("/api/providers");
+        const providers = await response.json();
+        providerSelect.innerHTML = "";
+        providers.forEach((provider) => {
+          const option = document.createElement("option");
+          option.value = provider.name;
+          option.textContent = `${provider.label}${provider.configured ? "" : " (configure key)"}`;
+          option.disabled = !provider.configured;
+          option.dataset.defaultModel = provider.default_model;
+          providerSelect.appendChild(option);
+        });
+        const firstEnabled = Array.from(providerSelect.options).find((option) => !option.disabled);
+        if (firstEnabled) {
+          providerSelect.value = firstEnabled.value;
+        }
+      }
+
+      function appendMessage(role, content) {
+        const message = document.createElement("div");
+        message.className = `message ${role}`;
+        const roleLabel = document.createElement("strong");
+        roleLabel.textContent = role === "assistant" ? "Assistant" : "You";
+        message.appendChild(roleLabel);
+        const text = document.createElement("p");
+        text.textContent = content;
+        message.appendChild(text);
+        conversation.appendChild(message);
+        conversation.scrollTop = conversation.scrollHeight;
+      }
+
+      async function sendMessage() {
+        const provider = providerSelect.value;
+        if (!provider) {
+          alert("Select a configured provider first.");
+          return;
+        }
+        const prompt = promptInput.value.trim();
+        if (!prompt) {
+          return;
+        }
+
+        appendMessage("user", prompt);
+        promptInput.value = "";
+        sendButton.disabled = true;
+
+        const payload = {
+          provider,
+          prompt,
+          system_prompt: systemInput.value.trim() || null,
+          model: modelInput.value.trim() || null,
+          history,
+        };
+
+        try {
+          const response = await fetch("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!response.ok) {
+            throw new Error(`Request failed with status ${response.status}`);
+          }
+          const data = await response.json();
+          appendMessage("assistant", data.reply);
+          history.push({ role: "user", content: prompt });
+          history.push({ role: "assistant", content: data.reply });
+        } catch (error) {
+          console.error(error);
+          appendMessage("assistant", `⚠️ ${error.message}`);
+        } finally {
+          sendButton.disabled = false;
+        }
+      }
+
+      function resetConversation() {
+        conversation.innerHTML = "";
+        history = [];
+      }
+
+      sendButton.addEventListener("click", sendMessage);
+      resetButton.addEventListener("click", resetConversation);
+      promptInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
+          sendMessage();
+        }
+      });
+
+      loadProviders();
+    </script>
+  </body>
+</html>
