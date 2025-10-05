@@ -2,7 +2,7 @@
 Comprehensive Tests for Async LLM Provider Service
 
 Tests all aspects of the async LLM provider service after sync function removal.
-Covers different providers (OpenAI, Ollama, Google) and error scenarios.
+Covers different providers (OpenAI, Anthropic Claude, Google) and error scenarios.
 """
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -64,14 +64,14 @@ class TestAsyncLLMProviderService:
         }
 
     @pytest.fixture
-    def ollama_provider_config(self):
-        """Standard Ollama provider config"""
+    def anthropic_provider_config(self):
+        """Standard Anthropic provider config"""
         return {
-            "provider": "ollama",
-            "api_key": "ollama",
-            "base_url": "http://localhost:11434/v1",
-            "chat_model": "llama2",
-            "embedding_model": "nomic-embed-text",
+            "provider": "anthropic",
+            "api_key": "test-anthropic-key",
+            "base_url": "https://api.anthropic.com/v1/",
+            "chat_model": "claude-3-5-sonnet-latest",
+            "embedding_model": "text-embedding-3-small",
         }
 
     @pytest.fixture
@@ -109,26 +109,35 @@ class TestAsyncLLMProviderService:
                 mock_credential_service.get_active_provider.assert_called_once_with("llm")
 
     @pytest.mark.asyncio
-    async def test_get_llm_client_ollama_success(
-        self, mock_credential_service, ollama_provider_config
+    async def test_get_llm_client_anthropic_success(
+        self, mock_credential_service, anthropic_provider_config
     ):
-        """Test successful Ollama client creation"""
-        mock_credential_service.get_active_provider.return_value = ollama_provider_config
+        """Test successful Anthropic client creation"""
+        mock_credential_service.get_active_provider.return_value = anthropic_provider_config
+
+        anthropic_patch = "src.server.services.llm_provider_service.AsyncAnthropic"
 
         with patch(
             "src.server.services.llm_provider_service.credential_service", mock_credential_service
         ):
-            with patch(
-                "src.server.services.llm_provider_service.openai.AsyncOpenAI"
-            ) as mock_openai:
-                mock_client = MagicMock()
-                mock_openai.return_value = mock_client
+            with patch(anthropic_patch) as mock_anthropic:
+                mock_anthropic_client = MagicMock()
+                mock_response = MagicMock()
+                mock_text_block = MagicMock()
+                mock_text_block.type = "text"
+                mock_text_block.text = "Hello from Claude"
+                mock_response.content = [mock_text_block]
+                mock_anthropic_client.messages.create = AsyncMock(return_value=mock_response)
+                mock_anthropic.return_value = mock_anthropic_client
 
                 async with get_llm_client() as client:
-                    assert client == mock_client
-                    mock_openai.assert_called_once_with(
-                        api_key="ollama", base_url="http://localhost:11434/v1"
+                    result = await client.chat.completions.create(
+                        model="claude-3-5-sonnet-latest",
+                        messages=[{"role": "user", "content": "Hi"}],
+                        max_tokens=128,
                     )
+                    assert result.choices[0].message.content == "Hello from Claude"
+                    mock_anthropic.assert_called_once_with(api_key="test-anthropic-key")
 
     @pytest.mark.asyncio
     async def test_get_llm_client_google_success(
@@ -203,6 +212,29 @@ class TestAsyncLLMProviderService:
 
                 # Verify embedding provider was requested
                 mock_credential_service.get_active_provider.assert_called_once_with("embedding")
+
+    @pytest.mark.asyncio
+    async def test_get_llm_client_anthropic_embedding_fallback(
+        self, mock_credential_service, anthropic_provider_config
+    ):
+        """Anthropic embeddings should fall back to OpenAI with a helpful message."""
+        mock_credential_service.get_active_provider.return_value = anthropic_provider_config
+        mock_credential_service._get_provider_api_key.return_value = "fallback-openai-key"
+
+        with patch(
+            "src.server.services.llm_provider_service.credential_service", mock_credential_service
+        ):
+            with patch(
+                "src.server.services.llm_provider_service.openai.AsyncOpenAI"
+            ) as mock_openai:
+                mock_client = MagicMock()
+                mock_openai.return_value = mock_client
+
+                async with get_llm_client(use_embedding_provider=True) as client:
+                    assert client == mock_client
+                    mock_openai.assert_called_once_with(api_key="fallback-openai-key")
+
+                mock_credential_service._get_provider_api_key.assert_any_call("openai")
 
     @pytest.mark.asyncio
     async def test_get_llm_client_missing_openai_key(self, mock_credential_service):
@@ -291,17 +323,17 @@ class TestAsyncLLMProviderService:
             mock_credential_service.get_active_provider.assert_called_once_with("embedding")
 
     @pytest.mark.asyncio
-    async def test_get_embedding_model_ollama_success(
-        self, mock_credential_service, ollama_provider_config
+    async def test_get_embedding_model_anthropic_success(
+        self, mock_credential_service, anthropic_provider_config
     ):
-        """Test getting embedding model for Ollama provider"""
-        mock_credential_service.get_active_provider.return_value = ollama_provider_config
+        """Test getting embedding model for Anthropic provider"""
+        mock_credential_service.get_active_provider.return_value = anthropic_provider_config
 
         with patch(
             "src.server.services.llm_provider_service.credential_service", mock_credential_service
         ):
             model = await get_embedding_model()
-            assert model == "nomic-embed-text"
+            assert model == "text-embedding-3-small"
 
     @pytest.mark.asyncio
     async def test_get_embedding_model_google_success(
@@ -442,7 +474,7 @@ class TestAsyncLLMProviderService:
         """Test creating clients for different providers in sequence"""
         configs = [
             {"provider": "openai", "api_key": "openai-key", "base_url": None},
-            {"provider": "ollama", "api_key": "ollama", "base_url": "http://localhost:11434/v1"},
+            {"provider": "anthropic", "api_key": "anthropic-key", "base_url": "https://api.anthropic.com/v1/"},
             {
                 "provider": "google",
                 "api_key": "google-key",
@@ -455,20 +487,37 @@ class TestAsyncLLMProviderService:
         ):
             with patch(
                 "src.server.services.llm_provider_service.openai.AsyncOpenAI"
-            ) as mock_openai:
-                mock_client = MagicMock()
-                mock_openai.return_value = mock_client
-
+            ) as mock_openai, patch(
+                "src.server.services.llm_provider_service.AsyncAnthropic"
+            ) as mock_anthropic:
                 for config in configs:
-                    # Clear cache between tests to force fresh credential service calls
                     import src.server.services.llm_provider_service as llm_module
 
                     llm_module._settings_cache.clear()
-
                     mock_credential_service.get_active_provider.return_value = config
 
-                    async with get_llm_client() as client:
-                        assert client == mock_client
+                    if config["provider"] == "anthropic":
+                        mock_anthropic_client = MagicMock()
+                        mock_response = MagicMock()
+                        mock_text = MagicMock()
+                        mock_text.type = "text"
+                        mock_text.text = "stream"
+                        mock_response.content = [mock_text]
+                        mock_anthropic_client.messages.create = AsyncMock(return_value=mock_response)
+                        mock_anthropic.return_value = mock_anthropic_client
+
+                        async with get_llm_client() as client:
+                            result = await client.chat.completions.create(
+                                model="claude", messages=[{"role": "user", "content": "hi"}]
+                            )
+                            assert result.choices[0].message.content == "stream"
+                            mock_anthropic.assert_called()
+                    else:
+                        mock_client = MagicMock()
+                        mock_openai.return_value = mock_client
+
+                        async with get_llm_client() as client:
+                            assert client == mock_client
 
                 # Should have been called once for each provider
                 assert mock_credential_service.get_active_provider.call_count == 3

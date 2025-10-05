@@ -13,273 +13,179 @@ import Admonition from '@theme/Admonition';
 ## Quick Start
 
 <Admonition type="tip" title="Prerequisites">
-- Docker and Docker Compose installed
-- Supabase account (free tier works)
+- Python 3.12 (with [uv](https://docs.astral.sh/uv/) recommended)
+- Node.js 18+
 - Git for cloning the repository
+- Supabase project or the Supabase CLI for local storage
 </Admonition>
 
-### 1. Clone & Setup
+### 1. Clone & Copy Environment
 
 ```bash
-# Clone repository
-git clone <repository-url>
-cd archon
+git clone https://github.com/coleam00/Archon.git
+cd Archon
 
-# Create environment file
 cp .env.example .env
 ```
 
-### 2. Configure
+### 2. Configure Supabase
 
-Edit `.env` with your credentials:
-
-```bash
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_KEY=eyJ0eXAi...
-```
-
-### 3. Launch
-
-```bash
-# Start all services
-docker-compose up -d
-
-# Check status
-docker-compose ps
-```
-
-### 4. Access
-
-- **UI**: http://localhost:3737
-- **API Docs**: http://localhost:8080/docs
-- **Documentation**: http://localhost:3838
-
-## Hot Module Reload (HMR)
-
-<Admonition type="tip" title="Built-in Hot Reload">
-Archon automatically includes Hot Module Reload for both Python server and React UI. Code changes are reflected immediately without container rebuilds.
-</Admonition>
-
-### What Changes Without Rebuild
+Update `.env` with your Supabase URL and `service_role` key.
 
 <Tabs>
-<TabItem value="python" label="Python Server">
+<TabItem value="cloud" label="Supabase Cloud">
 
-**✅ No Rebuild Required:**
-- Python source code changes (`.py` files)
-- Configuration changes in code
-- Business logic updates
-- API endpoint modifications
-- Socket.IO event handlers
-- Service layer changes
-
-**❌ Rebuild Required:**
-- New pip dependencies in `requirements.*.txt`
-- System package installations
-- Dockerfile modifications
-- Environment variable changes in docker-compose
+1. Create a project at [supabase.com](https://supabase.com).
+2. In **Project Settings → API**, copy the `Project URL` and `service_role` key.
+3. Paste those values into `.env`.
 
 </TabItem>
-<TabItem value="frontend" label="React UI">
+<TabItem value="local" label="Supabase CLI">
 
-**✅ No Rebuild Required:**
-- React components (`.tsx`, `.jsx`)
-- CSS/Tailwind styles
-- TypeScript code
-- Static assets in `public/`
-- Vite configuration (most changes)
+```bash
+supabase init       # one time per repository
+supabase start      # launches Postgres + Studio locally
+```
 
-**❌ Rebuild Required:**
-- New npm dependencies in `package.json`
-- Node version changes
-- Build tool configurations
-- Environment variable changes
+The CLI prints a local URL and service role key—use them in `.env`.
 
 </TabItem>
 </Tabs>
 
-### How HMR Works
+### 3. Run Database Migrations
 
-**Python Server:**
-- Uses `uvicorn --reload`
-- Watches file changes automatically
-- Restarts on save
-- WebSocket connections re-establish after reload
+Open the Supabase SQL editor (cloud or local Studio) and run `migration/complete_setup.sql` to create Archon tables and functions.
 
-**React UI:**
-- Vite's built-in HMR
-- Component state preserved when possible
-- CSS updates without page reload
-- Fast refresh for React components
+### 4. Install Dependencies
+
+```bash
+# Backend
+cd python
+uv sync
+cd ..
+
+# Frontend
+cd archon-ui-main
+npm install
+cd ..
+```
+
+### 5. Start Services
+
+```bash
+# Terminal 1 - FastAPI server
+cd python
+uv run python -m src.server.main
+
+# Terminal 2 - React UI
+cd archon-ui-main
+npm run dev -- --host 0.0.0.0 --port 3737
+```
+
+Visit [http://localhost:3737](http://localhost:3737) and complete onboarding by pasting an API key for OpenAI, Google Gemini, or Anthropic Claude.
+
+## Hot Module Reload (HMR)
+
+<Admonition type="tip" title="Built-in Hot Reload">
+Archon ships with hot reload for both the FastAPI server and the Vite-based UI. Save your changes and both stacks update instantly.
+</Admonition>
+
+### Python Server
+
+- Run with `uv run uvicorn src.server.main:app --reload` during development.
+- File changes trigger an automatic restart.
+- WebSocket clients reconnect after the server comes back online.
+- Install new dependencies with `uv add <package>` and restart the command.
+
+### React UI
+
+- `npm run dev` uses Vite's fast refresh.
+- Component state is preserved when possible.
+- Tailwind and CSS changes appear without a full reload.
+- Add new dependencies via `npm install <package>` and restart the dev server if needed.
 
 ### Tips
 
-1. **Monitor Logs**: Watch for reload messages
-   ```bash
-   docker logs -f Archon-Server
-   ```
-
-2. **Handle Disconnects**: The UI shows a disconnect screen during server reload
-
-3. **State Persistence**: Server state resets on reload, but database state persists
-
-<Admonition type="warning" title="MCP Service Note">
-The MCP service doesn't support hot reload. Restart manually after changes:
-```bash
-docker-compose restart archon-mcp
-```
-</Admonition>
+1. **Monitor Logs**: The FastAPI terminal prints reload events; Vite shows compilation output in its terminal.
+2. **Handle Disconnects**: The UI temporarily shows a reconnect toast while the backend restarts.
+3. **State Persistence**: Database data lives in Supabase, so reloading the services does not wipe your documents or tasks.
 
 ## Service Architecture
 
 ```mermaid
 graph LR
-    subgraph "Your Computer"
+    subgraph "Your Machine"
         Browser[Web Browser<br/>localhost:3737]
-        IDE[VS Code/Cursor<br/>localhost:8051]
+        Backend[FastAPI Server<br/>127.0.0.1:8181]
     end
-    
-    subgraph "Docker Containers"
-        Frontend[archon-frontend<br/>React UI]
-        API[Archon-Server<br/>FastAPI + Socket.IO]
-        MCP[archon-mcp<br/>MCP Server]
-        Agents[archon-agents<br/>AI Processing]
-        Docs[archon-docs<br/>Documentation]
+
+    subgraph "Storage"
+        Supabase[Supabase<br/>Cloud or Local CLI]
     end
-    
-    subgraph "Cloud Services"
-        Supabase[Supabase<br/>Database]
-        OpenAI[OpenAI<br/>AI Models]
+
+    subgraph "LLM Providers"
+        OpenAI[OpenAI]
+        Gemini[Google Gemini]
+        Claude[Anthropic Claude]
     end
-    
-    Browser --> Frontend
-    IDE --> MCP
-    Frontend --> API
-    API --> MCP
-    API --> Agents
-    API --> Supabase
-    Agents --> OpenAI
-    MCP --> Supabase
-    
-    style Frontend fill:#1a1a2e,stroke:#00d4ff,stroke-width:2px,color:#fff
-    style API fill:#1a1a2e,stroke:#00d4ff,stroke-width:2px,color:#fff
-    style MCP fill:#1a1a2e,stroke:#00d4ff,stroke-width:2px,color:#fff
-    style Agents fill:#1a1a2e,stroke:#ff6b6b,stroke-width:2px,color:#fff
+
+    Browser --> Backend
+    Backend --> Supabase
+    Backend --> OpenAI
+    Backend --> Gemini
+    Backend --> Claude
+
+    style Backend fill:#1a1a2e,stroke:#00d4ff,stroke-width:2px,color:#fff
     style Supabase fill:#16213e,stroke:#00ff88,stroke-width:2px,color:#fff
 ```
 
 ## Common Commands
 
 <Tabs>
-<TabItem value="basic" label="Basic Operations">
+<TabItem value="backend" label="Backend">
 
 ```bash
-# Start services
-docker-compose up -d
+# Start with auto-reload
+uv run uvicorn src.server.main:app --reload --host 0.0.0.0 --port 8181
 
-# Stop services
-docker-compose down
+# Run tests
+uv run pytest
 
-# View logs
-docker-compose logs -f
-
-# Restart a service
-docker-compose restart archon-frontend
+# Install a new dependency
+uv add <package>
 ```
 
 </TabItem>
-<TabItem value="troubleshooting" label="Troubleshooting">
+<TabItem value="frontend" label="Frontend">
 
 ```bash
-# Check container status
-docker ps
+# Start dev server
+npm run dev
 
-# View service logs
-docker logs archon-server
-docker logs archon-mcp
-docker logs archon-agents
+# Run unit tests
+npm test
 
-# Rebuild after changes
-docker-compose build
-docker-compose up -d
+# Add a dependency
+npm install <package>
+```
 
-# Complete reset
-docker-compose down -v
-docker-compose up -d --build
+</TabItem>
+<TabItem value="supabase" label="Supabase CLI">
+
+```bash
+# Start local stack
+supabase start
+
+# View logs
+supabase logs
+
+# Stop services
+supabase stop
 ```
 
 </TabItem>
 </Tabs>
 
-## Advanced Configuration
-
-<Admonition type="info" title="Scaling Archon">
-For team deployments, consider:
-- Using a reverse proxy (nginx/Caddy) for multiple users
-- Setting up SSL certificates for secure connections
-- Configuring resource limits based on usage
-- Using managed Supabase instances
+<Admonition type="info" title="Need Docker?">
+Legacy Docker Compose and MCP workflows still live in the repository, but they are no longer part of the default setup. Refer to the legacy docs folder if you need container-based deployment.
 </Admonition>
-
-## Database Management
-
-### Reset Database
-
-<Admonition type="warning" title="Data Loss Warning">
-This will delete ALL data in your database!
-</Admonition>
-
-```sql
--- Run in Supabase SQL editor
--- migration/RESET_DB.sql
-```
-
-### Backup Data
-
-```bash
-# Export data before reset
-pg_dump -h your-db-host -U postgres -d postgres > backup.sql
-```
-
-## Monitoring
-
-### Health Checks
-
-```bash
-# API Health
-curl http://localhost:8080/health
-
-# Check all services
-echo "Frontend: http://localhost:3737"
-curl -s http://localhost:3737 > /dev/null && echo "✓ Running" || echo "✗ Not running"
-
-echo "API: http://localhost:8080/health"
-curl -s http://localhost:8080/health | jq '.status' || echo "✗ Not running"
-
-echo "MCP: http://localhost:8051/sse"
-curl -s http://localhost:8051/sse > /dev/null && echo "✓ Running" || echo "✗ Not running"
-
-echo "Agents: http://localhost:8052/health"
-curl -s http://localhost:8052/health | jq '.status' || echo "✗ Not running"
-```
-
-### Container Resources
-
-```bash
-# View resource usage
-docker stats
-
-# Check disk usage
-docker system df
-```
-
-## Next Steps
-
-<Admonition type="success" title="Ready to Go!">
-Your Archon instance is now running. Next:
-
-1. **Set up API keys** in Settings
-2. **Configure MCP** for AI agents
-3. **Start crawling** knowledge sources
-4. **Create projects** and tasks
-</Admonition> 

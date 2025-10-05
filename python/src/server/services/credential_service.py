@@ -444,20 +444,21 @@ class CredentialService:
         key_mapping = {
             "openai": "OPENAI_API_KEY",
             "google": "GOOGLE_API_KEY",
-            "ollama": None,  # No API key needed
+            "anthropic": "ANTHROPIC_API_KEY",
+            "claude": "ANTHROPIC_API_KEY",
         }
 
         key_name = key_mapping.get(provider)
         if key_name:
             return await self.get_credential(key_name)
-        return "ollama" if provider == "ollama" else None
+        return None
 
     def _get_provider_base_url(self, provider: str, rag_settings: dict) -> str | None:
         """Get base URL for provider."""
-        if provider == "ollama":
-            return rag_settings.get("LLM_BASE_URL", "http://localhost:11434/v1")
-        elif provider == "google":
+        if provider == "google":
             return "https://generativelanguage.googleapis.com/v1beta/openai/"
+        elif provider in {"anthropic", "claude"}:
+            return "https://api.anthropic.com/v1/"
         return None  # Use default for OpenAI
 
     async def set_active_provider(self, provider: str, service_type: str = "llm") -> bool:
@@ -501,7 +502,6 @@ async def initialize_credentials() -> None:
         "OPENAI_API_KEY",  # Required for API client initialization
         "HOST",  # Server binding configuration
         "PORT",  # Server binding configuration
-        "MCP_TRANSPORT",  # Server transport mode
         "LOGFIRE_ENABLED",  # Logging infrastructure setup
         "PROJECTS_ENABLED",  # Feature flag for module loading
     ]
@@ -509,8 +509,8 @@ async def initialize_credentials() -> None:
     # LLM provider credentials (for sync client support)
     provider_credentials = [
         "GOOGLE_API_KEY",  # Google Gemini API key
+        "ANTHROPIC_API_KEY",  # Claude API key
         "LLM_PROVIDER",  # Selected provider
-        "LLM_BASE_URL",  # Ollama base URL
         "EMBEDDING_MODEL",  # Custom embedding model
         "MODEL_CHOICE",  # Chat model for sync contexts
     ]

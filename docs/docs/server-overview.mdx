@@ -5,59 +5,44 @@ sidebar_position: 3
 
 # Server Overview
 
-The Server service is the core of Archon, containing all business logic, services, and data operations.
+The FastAPI server powers Archon’s knowledge ingestion, retrieval, and project management workflows. It runs locally alongside the React UI and talks to Supabase plus your configured LLM provider.
 
 ## Architecture
 
 ### Service Responsibilities
 
-| Service | Port | Purpose | Contains |
-|---------|------|---------|----------|
-| **Server** | 8080 | Core API & business logic | Services, ML models, data operations |
-| **MCP** | 8051 | Protocol adapter for AI clients | HTTP client, MCP tool definitions |
-| **Agents** | 8052 | AI processing | PydanticAI agents only |
-| **Frontend** | 3737 | Web UI | React application |
-| **Docs** | 3838 | Documentation | Docusaurus site |
+| Service | Default Port | Purpose | Contains |
+|---------|--------------|---------|----------|
+| **Server** | 8181 | Core API & business logic | FastAPI app, Socket.IO, RAG orchestration |
+| **Frontend** | 3737 | Web UI | React application served by Vite |
+
+Legacy MCP and agent services remain in the repository but are disabled by default.
 
 ### Communication Flow
 
 ```
-Frontend → Server API ← MCP (via HTTP) ← AI Clients
-             ↓
-         Services
-             ↓
-         Database
+Frontend (HTTP/WebSocket) → FastAPI Server → Supabase & LLM Providers
 ```
 
-## Docker Services
-
-```yaml
-services:
-  archon-server:     # FastAPI + Socket.IO (port 8080)
-  archon-mcp:        # MCP Server (port 8051)
-  archon-agents:     # AI Agents (port 8052)
-  archon-frontend:   # React UI (port 3737)
-  archon-docs:       # Documentation (port 3838)
-```
+The UI communicates with the server over REST and Socket.IO. The server stores metadata in Supabase and calls OpenAI, Google Gemini, or Anthropic Claude depending on the models you configure.
 
 ## Key Components
 
 ### FastAPI Application
-- REST API endpoints
-- Socket.IO server for real-time communication
-- Service layer integration
+- REST API endpoints under `/api/*`
+- Socket.IO server for streaming updates and task progress
+- Background workers for crawling and document processing
 
 ### Service Layer
-All business logic is organized into service modules:
-- **RAG Services**: Crawling, search, document storage
-- **Project Services**: Project and task management
-- **Core Services**: Authentication, configuration
-- **Storage Services**: Database operations
-- **Embedding Services**: Vector generation
+Business logic is organized into modules under `python/src/server/services/`:
+- **RAG Services**: Crawling, search, document storage, and embeddings
+- **Project Services**: Project, feature, and task management
+- **Credential Services**: Secure storage of provider API keys
+- **Utility Services**: Notifications, logging, and configuration helpers
 
 ### External Services
-- **Supabase**: PostgreSQL + pgvector for data storage
-- **OpenAI API**: Embeddings generation
+- **Supabase**: PostgreSQL + pgvector for data storage (cloud or local CLI)
+- **LLM Providers**: OpenAI, Google Gemini, and Anthropic Claude for chat and embeddings
 
 ## API Structure
 
@@ -65,55 +50,57 @@ All business logic is organized into service modules:
 |--------|------|---------|
 | `knowledge_api.py` | `/api/knowledge-items` | Knowledge management, crawling |
 | `projects_api.py` | `/api/projects` | Project and task management |
-| `mcp_api.py` | `/api/mcp` | MCP server control |
 | `settings_api.py` | `/api/settings` | Configuration management |
-| `agent_chat_api.py` | `/api/agent-chat` | AI agent interactions |
+| `provider_api.py` | `/api/providers` | Model selection and credential checks |
+| `agent_chat_api.py` | `/api/agent-chat` | Chat completions and streaming |
 
 ## Environment Configuration
 
-Key environment variables:
+Key environment variables are defined in `.env`:
 
 ```bash
 # Database
 SUPABASE_URL=your_supabase_url
 SUPABASE_SERVICE_KEY=your_service_key
 
-# AI Services  
-OPENAI_API_KEY=your_openai_key
+# Optional overrides
+ARCHON_SERVER_PORT=8181
+HOST=127.0.0.1
 
-# Unified Logging Configuration (Optional)
-LOGFIRE_ENABLED=false              # true=Logfire logging, false=standard logging
-LOGFIRE_TOKEN=your_logfire_token    # Only required when LOGFIRE_ENABLED=true
-
-# Service URLs (for inter-service communication)
-API_BASE_URL=http://archon-server:8080
-AGENTS_BASE_URL=http://archon-agents:8052
+# Logging
+LOGFIRE_ENABLED=false
+# LOGFIRE_TOKEN=your_logfire_token
 ```
+
+Provider API keys are stored via the UI and encrypted in the database—no need to place them in `.env` unless you are automating setup.
 
 ## Development Setup
 
-1. **Clone repository**
+1. **Install dependencies**
    ```bash
-   git clone https://github.com/ArchonInnovations/archon.git
-   cd archon
+   cd python
+   uv sync
    ```
 
-2. **Start services**
+2. **Run the server with reload**
    ```bash
-   docker-compose up
+   uv run uvicorn src.server.main:app --reload --host 0.0.0.0 --port 8181
    ```
 
-3. **Access services**
-   - API Docs: http://localhost:8080/docs
-   - Frontend: http://localhost:3737
-   - Documentation: http://localhost:3838
+3. **Start the frontend**
+   ```bash
+   cd ../archon-ui-main
+   npm run dev
+   ```
 
-## Monitoring
+4. **Open the UI**
+   Visit [http://localhost:3737](http://localhost:3737) and complete onboarding. The UI proxies API requests to `http://127.0.0.1:8181` by default.
 
-Logfire provides real-time observability:
-- Request/response tracking
-- Performance metrics
-- Error monitoring
-- Service health checks
+## Monitoring & Logs
 
-Access your Logfire dashboard to monitor all services in real-time.
+- **Server logs**: Printed to the terminal running `uvicorn`
+- **Supabase**: Use the Supabase dashboard or CLI (`supabase logs`) to inspect database activity
+- **Logfire (optional)**: Enable by setting `LOGFIRE_ENABLED=true` and providing a `LOGFIRE_TOKEN`
+
+For production deployments you can keep the same commands under a process manager such as `systemd`, `pm2`, or `supervisord` on Linux/Windows.
+

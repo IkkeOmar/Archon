@@ -13,11 +13,11 @@ Archon provides a comprehensive REST API built with FastAPI for knowledge manage
 
 ## 🌐 Base URL & Authentication
 
-**Base URL**: `http://localhost:8080`
+**Base URL**: `http://localhost:8181`
 
 **Interactive Documentation**: 
-- Swagger UI: `http://localhost:8080/docs`
-- ReDoc: `http://localhost:8080/redoc`
+- Swagger UI: `http://localhost:8181/docs`
+- ReDoc: `http://localhost:8181/redoc`
 
 **Authentication**: Currently API key-based through settings. Future versions will support JWT tokens.
 
@@ -26,7 +26,6 @@ Archon provides a comprehensive REST API built with FastAPI for knowledge manage
 Archon uses a modular FastAPI architecture with separate routers for different functionalities:
 
 - **`knowledge_api.py`**: Knowledge items, web crawling, and document management 
-- **`mcp_api.py`**: MCP server control and Socket.IO communications 
 - **`settings_api.py`**: Application settings and credential management 
 - **`projects_api.py`**: Project and task management (refactored with service layer)
 - **`agent_chat_api.py`**: AI agent chat interface 
@@ -38,7 +37,6 @@ All routers are mounted with the `/api` prefix and provide comprehensive OpenAPI
 - [Knowledge Management](#knowledge-management-api)
 - [Document Management](#document-management-api)
 - [RAG API](#rag-retrieval-augmented-generation-api)
-- [MCP Server](#mcp-server-management-api)
 - [Project Management](#project-management-api)
 - [Task Management](#task-management-api)
 - [Settings](#settings-management-api)
@@ -46,7 +44,6 @@ All routers are mounted with the `/api` prefix and provide comprehensive OpenAPI
 - [Agent Chat](#agent-chat-api)
 - [Testing](#testing-api)
 - [System Info](#system-information-api)
-
 
 ## 📚 Knowledge Management API
 
@@ -70,7 +67,7 @@ Retrieve all knowledge items with optional filtering and pagination.
 #### Example Request
 
 ```bash
-curl -X GET "http://localhost:8080/api/knowledge-items?page=1&per_page=10&knowledge_type=technical" \
+curl -X GET "http://localhost:8181/api/knowledge-items?page=1&per_page=10&knowledge_type=technical" \
   -H "Accept: application/json"
 ```
 
@@ -156,7 +153,7 @@ Delete all knowledge items from a specific source.
 #### Example Request
 
 ```bash
-curl -X DELETE "http://localhost:8080/api/knowledge-items/docs.python.org" \
+curl -X DELETE "http://localhost:8181/api/knowledge-items/docs.python.org" \
   -H "Accept: application/json"
 ```
 
@@ -213,7 +210,7 @@ Archon automatically detects the content type and applies the appropriate crawli
 #### Example Request
 
 ```bash
-curl -X POST "http://localhost:8080/api/knowledge-items/crawl" \
+curl -X POST "http://localhost:8181/api/knowledge-items/crawl" \
   -H "Content-Type: application/json" \
   -d '{
     "url": "https://docs.python.org/3/tutorial/",
@@ -371,7 +368,7 @@ Upload and process documents (PDF, Word, Markdown, Text).
 #### Example Request
 
 ```bash
-curl -X POST "http://localhost:8080/api/documents/upload" \
+curl -X POST "http://localhost:8181/api/documents/upload" \
   -F "file=@python-guide.pdf" \
   -F "knowledge_type=technical" \
   -F "tags=[\"python\", \"guide\", \"programming\"]"
@@ -425,7 +422,7 @@ Perform semantic search across the knowledge base.
 #### Example Request
 
 ```bash
-curl -X POST "http://localhost:8080/api/rag/query" \
+curl -X POST "http://localhost:8181/api/rag/query" \
   -H "Content-Type: application/json" \
   -d '{
     "query": "How to handle exceptions in Python?",
@@ -506,7 +503,7 @@ Delete a source and all its associated data (crawled pages, code examples, embed
 #### Example Request
 
 ```bash
-curl -X DELETE "http://localhost:8080/api/sources/docs.python.org" \
+curl -X DELETE "http://localhost:8181/api/sources/docs.python.org" \
   -H "Accept: application/json"
 ```
 
@@ -528,235 +525,6 @@ curl -X DELETE "http://localhost:8080/api/sources/docs.python.org" \
 ```json
 {
   "error": "Source not found"
-}
-```
-
-## 🔧 MCP Server Management API
-
-### Get MCP Server Status
-
-**GET** `/api/mcp/status`
-
-Retrieve current MCP Docker container status and health information.
-
-#### Example Response
-
-```json
-{
-  "status": "running",
-  "container_id": "a1b2c3d4e5f6",
-  "container_name": "Archon-MCP",
-  "uptime": 3600,
-  "start_time": "2024-01-15T09:44:30Z",
-  "health": {
-    "status": "healthy",
-    "port": 8051,
-    "transport": "sse"
-  }
-}
-```
-
-### Start MCP Server
-
-**POST** `/api/mcp/start`
-
-Start the MCP Docker container.
-
-<Admonition type="info" title="Container Management">
-The MCP server runs as a Docker container named `Archon-MCP`. Ensure Docker is running and the container exists (created by docker-compose).
-</Admonition>
-
-#### Example Response
-
-```json
-{
-  "success": true,
-  "message": "MCP server started successfully",
-  "status": "running",
-  "container_id": "a1b2c3d4e5f6"
-}
-```
-
-### Stop MCP Server
-
-**POST** `/api/mcp/stop`
-
-Stop the running MCP Docker container.
-
-#### Example Response
-
-```json
-{
-  "success": true,
-  "message": "MCP server stopped successfully",
-  "status": "stopped"
-}
-```
-
-### Get MCP Logs
-
-**GET** `/api/mcp/logs`
-
-Retrieve recent MCP server logs.
-
-#### Query Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `limit` | integer | ❌ | Number of log entries (default: 100) |
-
-#### Example Response
-
-```json
-{
-  "logs": [
-    {
-      "timestamp": "2024-01-15T10:45:30Z",
-      "level": "INFO",
-      "message": "MCP server started successfully"
-    },
-    {
-      "timestamp": "2024-01-15T10:45:31Z",
-      "level": "INFO",
-      "message": "Registered 14 tools"
-    }
-  ]
-}
-```
-
-### Clear MCP Logs
-
-**DELETE** `/api/mcp/logs`
-
-Clear the MCP server log buffer.
-
-#### Example Response
-
-```json
-{
-  "success": true,
-  "message": "Logs cleared successfully"
-}
-```
-
-### Get MCP Configuration
-
-**GET** `/api/mcp/config`
-
-Retrieve MCP server configuration.
-
-#### Example Response
-
-```json
-{
-  "host": "localhost",
-  "port": 8051,
-  "transport": "sse",
-  "model_choice": "gpt-4o-mini",
-  "use_contextual_embeddings": false,
-  "use_hybrid_search": false,
-  "use_agentic_rag": false,
-  "use_reranking": false
-}
-```
-
-### Save MCP Configuration
-
-**POST** `/api/mcp/config`
-
-Save MCP server configuration.
-
-#### Request Body
-
-```json
-{
-  "transport": "sse",
-  "host": "localhost",
-  "port": 8051
-}
-```
-
-#### Example Response
-
-```json
-{
-  "success": true,
-  "message": "Configuration saved"
-}
-```
-
-### MCP Server Logs Stream
-
-**Socket.IO Namespace** `/logs`
-
-Real-time MCP server log streaming using Socket.IO.
-
-#### Connection Example
-
-```javascript
-import { io } from 'socket.io-client';
-
-// Connect to logs namespace
-const socket = io('/logs');
-
-// Handle connection
-socket.on('connect', () => {
-  console.log('Connected to log stream');
-});
-
-// Handle log entries
-socket.on('log_entry', (data) => {
-  console.log(`[${data.timestamp}] ${data.level}: ${data.message}`);
-});
-
-// Handle batch logs
-socket.on('log_batch', (logs) => {
-  logs.forEach(log => {
-    console.log(`[${log.timestamp}] ${log.level}: ${log.message}`);
-  });
-});
-```
-
-### Get MCP Tools
-
-**GET** `/api/mcp/tools`
-
-Get list of available MCP tools.
-
-#### Example Response
-
-```json
-{
-  "tools": [
-    {
-      "name": "perform_rag_query",
-      "description": "Search the knowledge base using semantic search",
-      "module": "rag",
-      "parameters": [
-        {"name": "query", "type": "string", "required": true},
-        {"name": "source", "type": "string", "required": false},
-        {"name": "match_count", "type": "integer", "required": false}
-      ]
-    }
-  ],
-  "count": 14,
-  "server_running": true,
-  "source": "mcp_server"
-}
-```
-
-### MCP Health Check
-
-**GET** `/api/mcp/health`
-
-Health check for MCP API module.
-
-#### Example Response
-
-```json
-{
-  "status": "healthy",
-  "service": "mcp"
 }
 ```
 
@@ -1023,7 +791,7 @@ Archon uses the simplified Socket.IO pattern with direct event handlers on the r
 import { io } from 'socket.io-client';
 
 // Connect to root namespace 
-const socket = io('http://localhost:8080');
+const socket = io('http://localhost:8181');
 
 socket.on('connect', () => {
   console.log('Connected to Archon Socket.IO server');
@@ -1199,27 +967,6 @@ Delete a task.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `task_id` | string | ✅ | Task UUID |
-
-
-### Update Task Status (MCP)
-
-**PUT** `/api/mcp/tasks/{task_id}/status`
-
-Update task status (MCP compatibility endpoint).
-
-#### Path Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `task_id` | string | ✅ | Task UUID |
-
-#### Request Body
-
-```json
-{
-  "status": "doing"
-}
-```
 
 ## ⚙️ Settings Management API
 
@@ -1475,7 +1222,7 @@ Retrieve all RAG configuration settings including LLM provider options.
 
 | Setting | Type | Description |
 |---------|------|-------------|
-| `LLM_PROVIDER` | string | Provider choice: `openai`, `ollama`, `google` |
+| `LLM_PROVIDER` | string | Provider choice: `openai`, `google`, `anthropic` |
 | `LLM_BASE_URL` | string | Custom base URL (required for Ollama) |
 | `EMBEDDING_MODEL` | string | Override default embedding model |
 | `MODEL_CHOICE` | string | Chat model for summaries and contextual embeddings |
@@ -1645,32 +1392,6 @@ Get token usage statistics for debugging.
 ```
 
 ## 🧪 Testing API
-
-### Run MCP Tests
-
-**POST** `/api/tests/mcp/run`
-
-Run MCP integration tests.
-
-#### Request Body
-
-```json
-{
-  "test_filter": "test_rag_query",
-  "verbose": true
-}
-```
-
-#### Example Response
-
-```json
-{
-  "success": true,
-  "execution_id": "test-exec-uuid",
-  "message": "MCP tests started",
-  "test_count": 5
-}
-```
 
 ### Run UI Tests
 
@@ -1854,7 +1575,7 @@ import json
 from typing import List, Dict, Any
 
 class ArchonClient:
-    def __init__(self, base_url: str = "http://localhost:8080"):
+    def __init__(self, base_url: str = "http://localhost:8181"):
         self.base_url = base_url
         self.session = requests.Session()
     
@@ -1925,7 +1646,7 @@ print(f"Found {len(results['results'])} relevant documents")
 
 ```javascript
 class ArchonClient {
-  constructor(baseUrl = 'http://localhost:8080') {
+  constructor(baseUrl = 'http://localhost:8181') {
     this.baseUrl = baseUrl;
   }
 
@@ -2040,7 +1761,6 @@ client.startCrawl('https://docs.python.org/3/tutorial/', 'technical', ['python',
 ---
 
 **Next Steps**: 
-- Explore [MCP Integration](./mcp-overview) to connect AI clients
 - Learn about [RAG Strategies](./rag) for optimal search performance  
 - Check [Socket.IO Communication](./websockets) for real-time features
 - Review [Testing Guide](./testing) for API testing examples 

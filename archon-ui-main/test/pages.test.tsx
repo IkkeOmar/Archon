@@ -89,13 +89,24 @@ describe('Onboarding Detection Tests', () => {
     expect(isLmConfigured(ragCreds, apiKeyCreds)).toBe(false)
   })
 
-  test('isLmConfigured returns true when provider is ollama regardless of API keys', () => {
+  test('isLmConfigured returns true when provider is anthropic and ANTHROPIC_API_KEY exists', () => {
     const ragCreds: NormalizedCredential[] = [
-      { key: 'LLM_PROVIDER', value: 'ollama', category: 'rag_strategy' }
+      { key: 'LLM_PROVIDER', value: 'anthropic', category: 'rag_strategy' }
+    ]
+    const apiKeyCreds: NormalizedCredential[] = [
+      { key: 'ANTHROPIC_API_KEY', value: 'sk-ant-123', category: 'api_keys' }
+    ]
+
+    expect(isLmConfigured(ragCreds, apiKeyCreds)).toBe(true)
+  })
+
+  test('isLmConfigured returns false when provider is anthropic and no ANTHROPIC_API_KEY', () => {
+    const ragCreds: NormalizedCredential[] = [
+      { key: 'LLM_PROVIDER', value: 'anthropic', category: 'rag_strategy' }
     ]
     const apiKeyCreds: NormalizedCredential[] = []
-    
-    expect(isLmConfigured(ragCreds, apiKeyCreds)).toBe(true)
+
+    expect(isLmConfigured(ragCreds, apiKeyCreds)).toBe(false)
   })
 
   test('isLmConfigured returns true when no provider but OPENAI_API_KEY exists', () => {

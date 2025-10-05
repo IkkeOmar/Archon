@@ -43,7 +43,7 @@ export const TestStatus = () => {
   const [hasResults, setHasResults] = useState(false);
   
   const [mcpTest, setMcpTest] = useState<TestExecutionState>({
-    logs: ['> Ready to run Python tests...'],
+    logs: ['> Ready to run backend tests...'],
     isRunning: false,
     results: []
   });
@@ -241,7 +241,7 @@ export const TestStatus = () => {
       console.log(`[DEBUG] Resetting test state for ${testType}`);
       updateTestState(testType, (prev) => ({
         ...prev,
-        logs: [`> Starting ${testType === 'mcp' ? 'Python' : 'React UI'} tests...`],
+        logs: [`> Starting ${testType === 'mcp' ? 'backend' : 'React UI'} tests...`],
         results: [],
         summary: undefined,
         isRunning: true,
@@ -250,10 +250,10 @@ export const TestStatus = () => {
       }));
 
       if (testType === 'mcp') {
-        console.log('[DEBUG] Running MCP tests via backend API');
-        // Python tests: Use backend API with WebSocket streaming
-        const execution = await testService.runMCPTests();
-        console.log('[DEBUG] MCP test execution response:', execution);
+        console.log('[DEBUG] Running backend tests via API');
+        // Backend tests: Use API with WebSocket streaming
+        const execution = await testService.runBackendTests();
+        console.log('[DEBUG] Backend test execution response:', execution);
         
         // Update state with execution info
         updateTestState(testType, (prev) => ({
@@ -543,7 +543,7 @@ export const TestStatus = () => {
                   <div className="text-xs text-red-700 dark:text-red-300 space-y-1">
                     <div>Total Errors: {testState.logs.filter(log => log.includes('ERROR:') || log.includes('FAILED')).length}</div>
                     <div>Assertion Failures: {testState.logs.filter(log => log.includes('AssertionError')).length}</div>
-                    <div>Test Type: {testType === 'mcp' ? 'Python MCP Tools' : 'React UI Components'}</div>
+                    <div>Test Type: {testType === 'mcp' ? 'Backend API' : 'React UI Components'}</div>
                     <div>Status: Failed</div>
                   </div>
                 </div>

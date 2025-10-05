@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <em>Power up your AI coding assistants with your own custom knowledge base and task management as an MCP server</em>
+  <em>Power up your AI coding assistants with a local-first knowledge base and project hub</em>
 </p>
 
 <p align="center">
@@ -18,7 +18,7 @@
 
 > Archon is currently in beta! Expect things to not work 100%, and please feel free to share any feedback and contribute with fixes/new features! Thank you to everyone for all the excitement we have for Archon already, as well as the bug reports, PRs, and discussions. It's a lot for our small team to get through but we're committed to addressing everything and making Archon into the best tool it possibly can be!
 
-Archon is the **command center** for AI coding assistants. For you, it's a sleek interface to manage knowledge, context, and tasks for your projects. For the AI coding assistant(s), it's a **Model Context Protocol (MCP) server** to collaborate on and leverage the same knowledge, context, and tasks. Connect Claude Code, Kiro, Cursor, Windsurf, etc. to give your AI agents access to:
+Archon is the **command center** for AI coding assistants. For you, it's a sleek interface to manage knowledge, context, and tasks for your projects. Connect Claude Code, Kiro, Cursor, Windsurf, etc. to give your AI agents access to:
 
 - **Your documentation** (crawled websites, uploaded PDFs/docs)
 - **Smart search capabilities** with advanced RAG strategies
@@ -39,54 +39,74 @@ This new vision for Archon replaces the old one (the agenteer). Archon used to b
 
 ## Quick Start
 
+Archon now runs as a lightweight local web app—no Docker Compose or MCP services required. The commands below work on macOS/Linux (bash) and Windows (PowerShell). Substitute `./` with `.` on Windows where needed.
+
 ### Prerequisites
 
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-- [Supabase](https://supabase.com/) account (free tier or local Supabase both work)
-- [OpenAI API key](https://platform.openai.com/api-keys) (Gemini and Ollama are supported too!)
+- **Python 3.12** (we recommend [uv](https://docs.astral.sh/uv/) for dependency management)
+- **Node.js 18+**
+- **Git**
+- **Supabase storage choice**
+  - *Cloud*: a free [Supabase](https://supabase.com/) project
+  - *Local*: the [Supabase CLI](https://supabase.com/docs/guides/local-development) (`supabase start`) if you prefer to keep data on your machine
+- An API key for **one** of the supported LLM providers (OpenAI, Google Gemini, or Anthropic Claude)
 
-### Setup Instructions
+### 1. Clone the repository
 
-1. **Clone Repository**:
+```bash
+git clone https://github.com/coleam00/archon.git
+cd archon
+```
 
-   ```bash
-   git clone https://github.com/coleam00/archon.git
-   cd archon
-   ```
+### 2. Configure environment variables
 
-2. **Environment Configuration**:
+Copy the example file and update the Supabase credentials for the storage option you selected. The server key must be the `service_role` key.
 
-   ```bash
-   cp .env.example .env
-   # Edit .env and add your Supabase credentials:
-   # SUPABASE_URL=https://your-project.supabase.co
-   # SUPABASE_SERVICE_KEY=your-service-key-here
-   ```
+```bash
+cp .env.example .env
+# then edit .env with your values
+```
 
-   NOTE: Supabase introduced a new type of service key but use the legacy one (the longer one).
+For local storage run `supabase init` once, then `supabase start` to launch a Postgres + Studio stack on localhost. Use the generated URL and service role key in your `.env` file.
 
-   OPTIONAL: If you want to enable the reranking RAG strategy, uncomment lines 20-22 in `python\requirements.server.txt`. This will significantly increase the size of the Archon Server container which is why it's off by default.
+### 3. Prepare the database
 
-3. **Database Setup**: In your [Supabase project](https://supabase.com/dashboard) SQL Editor, copy, paste, and execute the contents of `migration/complete_setup.sql`
+Run the SQL in `migration/complete_setup.sql` inside your Supabase project (cloud dashboard or local Studio) to create all required tables and functions.
 
-4. **Start Services**:
+### 4. Install backend dependencies
 
-   ```bash
-   docker-compose up --build -d
-   ```
+```bash
+cd python
+uv sync
+cd ..
+```
 
-   This starts the core microservices:
-   - **Server**: Core API and business logic (Port: 8181)
-   - **MCP Server**: Protocol interface for AI clients (Port: 8051)
-   - **Agents (coming soon!)**: AI operations and streaming (Port: 8052)
-   - **UI**: Web interface (Port: 3737)
+`uv` creates an isolated virtual environment inside `.venv` and resolves all Python dependencies.
 
-   Ports are configurable in your .env as well!
+### 5. Start the FastAPI backend
 
-5. **Configure API Keys**:
-   - Open http://localhost:3737
-   - Go to **Settings** → Select your LLM/embedding provider and set the API key (OpenAI is default)
-   - Test by uploading a document or crawling a website
+```bash
+cd python
+uv run python -m src.server.main
+```
+
+The API listens on `http://127.0.0.1:8181` by default. You can change the port through `ARCHON_SERVER_PORT` in `.env`.
+
+### 6. Install and start the React UI
+
+```bash
+cd archon-ui-main
+npm install
+npm run dev -- --host 0.0.0.0 --port 3737
+```
+
+Visit [http://localhost:3737](http://localhost:3737) to open the interface. On first launch you’ll be asked to paste the API key for your chosen provider (OpenAI, Gemini, or Claude). You can always update credentials later via **Settings → API Keys**.
+
+### 7. Verify the setup
+
+1. Upload a document or crawl a URL in **Knowledge Base** to populate your knowledge graph.
+2. Check **Settings → RAG Settings** to confirm that the provider and embedding models look correct.
+3. Optionally keep the backend running with a process manager (`uv run -- --reload`) and start the UI with `npm run dev` whenever you need the dashboard.
 
 ## 🔄 Database Reset (Start Fresh if Needed)
 
@@ -103,8 +123,16 @@ If you need to completely reset your database and start fresh:
 
 3. **Restart Services**:
 
+   Restart your local processes:
+
    ```bash
-   docker-compose up -d
+   # Terminal 1
+   cd python
+   uv run python -m src.server.main
+
+   # Terminal 2
+   cd archon-ui-main
+   npm run dev
    ```
 
 4. **Reconfigure**:
@@ -122,18 +150,16 @@ Once everything is running:
 1. **Test Web Crawling**: Go to http://localhost:3737 → Knowledge Base → "Crawl Website" → Enter a doc URL (such as https://ai.pydantic.dev/llms-full.txt)
 2. **Test Document Upload**: Knowledge Base → Upload a PDF
 3. **Test Projects**: Projects → Create a new project and add tasks
-4. **Integrate with your AI coding assistant**: MCP Dashboard → Copy connection config for your AI coding assistant
+4. **Invite your AI coding assistant**: Copy the FastAPI base URL (`http://127.0.0.1:8181`) into your assistant’s custom tool configuration so it can call Archon’s REST endpoints.
 
 ## 📚 Documentation
 
 ### Core Services
 
-| Service            | Container Name | Default URL           | Purpose                           |
-| ------------------ | -------------- | --------------------- | --------------------------------- |
-| **Web Interface**  | archon-ui      | http://localhost:3737 | Main dashboard and controls       |
-| **API Service**    | archon-server  | http://localhost:8181 | Web crawling, document processing |
-| **MCP Server**     | archon-mcp     | http://localhost:8051 | Model Context Protocol interface  |
-| **Agents Service** | archon-agents  | http://localhost:8052 | AI/ML operations, reranking       |
+| Service         | How to start                                 | Default URL           | Purpose                           |
+| --------------- | -------------------------------------------- | --------------------- | --------------------------------- |
+| **Web Interface** | `npm run dev` (inside `archon-ui-main`)       | http://localhost:3737 | Main dashboard and controls       |
+| **API Service**   | `uv run python -m src.server.main` (in `python/`) | http://127.0.0.1:8181 | Web crawling, document processing |
 
 ## What's Included
 
@@ -147,9 +173,7 @@ Once everything is running:
 
 ### 🤖 AI Integration
 
-- **Model Context Protocol (MCP)**: Connect any MCP-compatible client (Claude Code, Cursor, even non-AI coding assistants like Claude Desktop)
-- **10 MCP Tools**: Comprehensive yet simple set of tools for RAG queries, task management, and project operations
-- **Multi-LLM Support**: Works with OpenAI, Ollama, and Google Gemini models
+- **Multi-LLM Support**: Works with OpenAI, Google Gemini, and Anthropic Claude models
 - **RAG Strategies**: Hybrid search, contextual embeddings, and result reranking for optimal AI responses
 - **Real-time Streaming**: Live responses from AI agents with progress tracking
 
@@ -171,60 +195,54 @@ Once everything is running:
 
 ### Microservices Structure
 
-Archon uses true microservices architecture with clear separation of concerns:
+The streamlined developer build focuses on two local services:
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Frontend UI   │    │  Server (API)   │    │   MCP Server    │    │ Agents Service  │
-│                 │    │                 │    │                 │    │                 │
-│  React + Vite   │◄──►│    FastAPI +    │◄──►│    Lightweight  │◄──►│   PydanticAI    │
-│  Port 3737      │    │    SocketIO     │    │    HTTP Wrapper │    │   Port 8052     │
-│                 │    │    Port 8181    │    │    Port 8051    │    │                 │
-└─────────────────┘    └─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                        │                        │                        │
-         └────────────────────────┼────────────────────────┼────────────────────────┘
-                                  │                        │
-                         ┌─────────────────┐               │
-                         │    Database     │               │
-                         │                 │               │
-                         │    Supabase     │◄──────────────┘
-                         │    PostgreSQL   │
-                         │    PGVector     │
-                         └─────────────────┘
+┌─────────────────┐    ┌─────────────────┐
+│   Frontend UI   │    │  Server (API)   │
+│                 │    │                 │
+│  React + Vite   │◄──►│ FastAPI + RAG   │
+│  Port 3737      │    │  Port 8181      │
+└─────────────────┘    └─────────────────┘
+         │                    │
+         └──────────────┬─────┘
+                        │
+               ┌─────────────────┐
+               │    Database     │
+               │                 │
+               │ Supabase (cloud │
+               │  or local CLI)  │
+               └─────────────────┘
 ```
+
+Legacy MCP and agent services remain in the repository for teams that rely on them, but they are no longer part of the default setup.
 
 ### Service Responsibilities
 
-| Service        | Location             | Purpose                      | Key Features                                                       |
-| -------------- | -------------------- | ---------------------------- | ------------------------------------------------------------------ |
-| **Frontend**   | `archon-ui-main/`    | Web interface and dashboard  | React, TypeScript, TailwindCSS, Socket.IO client                   |
-| **Server**     | `python/src/server/` | Core business logic and APIs | FastAPI, service layer, Socket.IO broadcasts, all ML/AI operations |
-| **MCP Server** | `python/src/mcp/`    | MCP protocol interface       | Lightweight HTTP wrapper, 10 MCP tools, session management         |
-| **Agents**     | `python/src/agents/` | PydanticAI agent hosting     | Document and RAG agents, streaming responses                       |
+| Service      | Location             | Purpose                      | Key Features |
+| ------------ | -------------------- | ---------------------------- | ------------ |
+| **Frontend** | `archon-ui-main/`    | Web interface and dashboard  | React, TypeScript, TailwindCSS, Socket.IO client |
+| **Server**   | `python/src/server/` | Core business logic and APIs | FastAPI, knowledge ingest, RAG orchestration |
 
 ### Communication Patterns
 
 - **HTTP-based**: All inter-service communication uses HTTP APIs
 - **Socket.IO**: Real-time updates from Server to Frontend
-- **MCP Protocol**: AI clients connect to MCP Server via SSE or stdio
 - **No Direct Imports**: Services are truly independent with no shared code dependencies
 
 ### Key Architectural Benefits
 
-- **Lightweight Containers**: Each service contains only required dependencies
-- **Independent Scaling**: Services can be scaled independently based on load
-- **Development Flexibility**: Teams can work on different services without conflicts
-- **Technology Diversity**: Each service uses the best tools for its specific purpose
+- **Local-first**: Everything runs directly on your machine with no container overhead
+- **Simple Networking**: Two HTTP services talk over localhost—easy to debug and secure
+- **Modular Services**: Frontend and backend can be developed and updated independently
+- **Supabase Flexibility**: Use a managed project or run the Supabase CLI locally without changing Archon
 
 ## 🔧 Configuring Custom Ports & Hostname
 
 By default, Archon services run on the following ports:
 
-- **Archon-UI**: 3737
-- **Archon-Server**: 8181
-- **Archon-MCP**: 8051
-- **Archon-Agents**: 8052
-- **Archon-Docs**: 3838 (optional)
+- **Archon UI**: 3737
+- **Archon Server**: 8181
 
 ### Changing Ports
 
@@ -234,16 +252,12 @@ To use custom ports, add these variables to your `.env` file:
 # Service Ports Configuration
 ARCHON_UI_PORT=3737
 ARCHON_SERVER_PORT=8181
-ARCHON_MCP_PORT=8051
-ARCHON_AGENTS_PORT=8052
-ARCHON_DOCS_PORT=3838
 ```
 
 Example: Running on different ports:
 
 ```bash
 ARCHON_SERVER_PORT=8282
-ARCHON_MCP_PORT=8151
 ```
 
 ### Configuring Hostname
@@ -266,28 +280,27 @@ This is useful when:
 - Using a custom domain name for your installation
 - Deploying in a network environment where `localhost` isn't accessible
 
-After changing hostname or ports:
-
-1. Restart Docker containers: `docker-compose down && docker-compose up -d`
-2. Access the UI at: `http://${HOST}:${ARCHON_UI_PORT}`
-3. Update your AI client configuration with the new hostname and MCP port
+After changing hostname or ports restart the FastAPI server and UI dev server so they pick up the new environment variables.
 
 ## 🔧 Development
 
 For development with hot reload:
 
 ```bash
-# Backend services (with auto-reload)
-docker-compose up archon-server archon-mcp archon-agents --build
+# Backend (with auto-reload)
+cd python
+uv run uvicorn src.server.main:app --reload --host 0.0.0.0 --port 8181
 
 # Frontend (with hot reload)
-cd archon-ui-main && npm run dev
+cd archon-ui-main
+npm run dev
 
 # Documentation (with hot reload)
-cd docs && npm start
+cd docs
+npm start
 ```
 
-**Note**: The backend services are configured with `--reload` flag in their uvicorn commands and have source code mounted as volumes for automatic hot reloading when you make changes.
+**Note**: uvicorn's `--reload` flag automatically restarts the API when backend code changes. Vite provides instant reloads for the UI.
 
 ## 📄 License
 

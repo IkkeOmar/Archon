@@ -6,7 +6,6 @@ not by external clients. They provide internal functionality like credential sha
 """
 
 import logging
-import os
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -23,7 +22,6 @@ ALLOWED_INTERNAL_IPS = [
     "127.0.0.1",  # Localhost
     "172.18.0.0/16",  # Docker network range
     "archon-agents",  # Docker service name
-    "archon-mcp",  # Docker service name
 ]
 
 
@@ -97,8 +95,6 @@ async def get_agent_credentials(request: Request) -> dict[str, Any]:
             "AGENT_MAX_RETRIES": await credential_service.get_credential(
                 "AGENT_MAX_RETRIES", default="3"
             ),
-            # MCP endpoint
-            "MCP_SERVICE_URL": f"http://archon-mcp:{os.getenv('ARCHON_MCP_PORT')}",
             # Additional settings
             "LOG_LEVEL": await credential_service.get_credential("LOG_LEVEL", default="INFO"),
         }
@@ -113,28 +109,3 @@ async def get_agent_credentials(request: Request) -> dict[str, Any]:
         logger.error(f"Error retrieving agent credentials: {e}")
         raise HTTPException(status_code=500, detail="Failed to retrieve credentials")
 
-
-@router.get("/credentials/mcp")
-async def get_mcp_credentials(request: Request) -> dict[str, Any]:
-    """
-    Get credentials needed by the MCP service.
-
-    This endpoint provides credentials for the MCP service if needed in the future.
-    """
-    # Check if request is from internal source
-    if not is_internal_request(request):
-        logger.warning(f"Unauthorized access to internal credentials from {request.client.host}")
-        raise HTTPException(status_code=403, detail="Access forbidden")
-
-    try:
-        credentials = {
-            # MCP might need some credentials in the future
-            "LOG_LEVEL": await credential_service.get_credential("LOG_LEVEL", default="INFO"),
-        }
-
-        logger.info(f"Provided credentials to MCP service from {request.client.host}")
-        return credentials
-
-    except Exception as e:
-        logger.error(f"Error retrieving MCP credentials: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve credentials")

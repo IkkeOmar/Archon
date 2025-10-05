@@ -143,16 +143,15 @@ name = "archon"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "anthropic" },
     { name = "asyncpg" },
     { name = "crawl4ai" },
     { name = "cryptography" },
-    { name = "docker" },
     { name = "dotenv" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "logfire" },
     { name = "markdown" },
-    { name = "mcp" },
     { name = "openai" },
     { name = "pdfplumber" },
     { name = "pydantic" },
@@ -201,10 +200,10 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "anthropic", specifier = ">=0.39.0" },
     { name = "asyncpg", specifier = ">=0.29.0" },
     { name = "crawl4ai", specifier = "==0.6.2" },
     { name = "cryptography", specifier = ">=41.0.0" },
-    { name = "docker", specifier = ">=7.1.0" },
     { name = "docker", marker = "extra == 'test'", specifier = ">=7.0.0" },
     { name = "dotenv", specifier = "==0.9.9" },
     { name = "factory-boy", marker = "extra == 'test'", specifier = ">=3.3.0" },
@@ -216,7 +215,6 @@ requires-dist = [
     { name = "httpx", marker = "extra == 'test'", specifier = ">=0.24.0" },
     { name = "logfire", specifier = ">=0.30.0" },
     { name = "markdown", specifier = ">=3.8" },
-    { name = "mcp", specifier = "==1.7.1" },
     { name = "openai", specifier = "==1.71.0" },
     { name = "pdfplumber", specifier = ">=0.11.6" },
     { name = "pydantic", specifier = ">=2.0.0" },

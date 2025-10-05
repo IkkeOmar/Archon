@@ -6,7 +6,6 @@ It uses a modular approach with separate API modules for different functionality
 
 Modules:
 - settings_api: Settings and credentials management
-- mcp_api: MCP server management and WebSocket streaming
 - knowledge_api: Knowledge base, crawling, and RAG operations
 - projects_api: Project and task management with streaming
 """
@@ -24,7 +23,6 @@ from .api_routes.bug_report_api import router as bug_report_router
 from .api_routes.coverage_api import router as coverage_router
 from .api_routes.internal_api import router as internal_router
 from .api_routes.knowledge_api import router as knowledge_router
-from .api_routes.mcp_api import router as mcp_router
 from .api_routes.projects_api import router as projects_router
 
 # Import Socket.IO handlers to ensure they're registered
@@ -206,7 +204,6 @@ async def skip_health_check_logs(request, call_next):
 
 # Include API routers
 app.include_router(settings_router)
-app.include_router(mcp_router)
 # app.include_router(mcp_client_router)  # Removed - not part of new architecture
 app.include_router(knowledge_router)
 app.include_router(projects_router)
@@ -226,7 +223,7 @@ async def root():
         "version": "1.0.0",
         "description": "Backend API for knowledge management and project automation",
         "status": "healthy",
-        "modules": ["settings", "mcp", "mcp-clients", "knowledge", "projects"],
+        "modules": ["settings", "knowledge", "projects"],
     }
 
 
