@@ -1,5 +1,11 @@
-__pycache__
+__pycache__/
+*.pyc
 .env
-.serena
-.claude/settings.local.json
-PRPs/local
+.venv/
+coverage.xml
+htmlcov/
+.coverage*
+.data/
+data/app.db
+pip-wheel-metadata/
+.pytest_cache/
